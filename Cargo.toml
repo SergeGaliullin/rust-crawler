@@ -4,6 +4,6 @@ version = "0.1.0"
 authors = ["serge <sergei.galiullin@gmail.com>"]
 
 [dependencies]
-hyper = "0.1.0"
+hyper = "0.10.1"
 html5ever = "0.21.0"
 url = "0.2.37"
