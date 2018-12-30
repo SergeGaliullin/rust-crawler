@@ -1,6 +1,6 @@
 use std::string::String;
-use html5ever::tendril::TendrilSink;
 
+use html5ever::tendril::TendrilSink;
 use html5ever::parse_document;
 use html5ever::rcdom::{Handle, NodeData, RcDom};
 use html5ever::interface::Attribute;
@@ -19,11 +19,11 @@ pub fn get_urls(handle: Handle) -> Vec<String> {
     get_elements_by_name(handle, "a", &mut anchor_tags);
 
     for node in anchor_tags {
-        if let NodeData::Element { ref attrs, ..} = node {
+        if let NodeData::Element { ref attrs, .. } = node {
             for attr in attrs.borrow().iter() {
                 let Attribute {
                     ref name,
-                    ref value
+                    ref value,
                 } = *attr;
                 if &*(name.local) == "href" {
                     urls.push(value.to_string());
@@ -43,13 +43,14 @@ fn get_elements_by_name(handle: Handle, element_name: &str, out: &mut Vec<NodeDa
         ref attrs,
         ref template_contents,
         ..
-    } = node.data {
+    } = node.data
+    {
         if &*(name.local) == element_name {
             out.push(NodeData::Element {
                 name: name.clone(),
                 attrs: attrs.clone(),
                 template_contents: template_contents.clone(),
-                mathml_annotation_xml_integration_point: false
+                mathml_annotation_xml_integration_point: false,
             });
         }
     }

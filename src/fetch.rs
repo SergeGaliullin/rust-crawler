@@ -13,7 +13,7 @@ use self::url::{ParseResult, Url, UrlParser};
 
 use parse;
 
-const TIMEOUT: u64 = 10;
+const TIMEOUT: u64 = 20;
 
 #[derive(Debug, Clone)]
 pub enum UrlState {
@@ -21,7 +21,7 @@ pub enum UrlState {
     BadStatus(Url, StatusCode),
     ConnectionFailed(Url),
     TimedOut(Url),
-    Malformed(String)
+    Malformed(String),
 }
 
 impl fmt::Display for UrlState {
@@ -31,13 +31,13 @@ impl fmt::Display for UrlState {
             UrlState::BadStatus(ref url, ref status) => format!("x {} ({})", url, status).fmt(f),
             UrlState::ConnectionFailed(ref url) => format!("x {} (connection failed)", url).fmt(f),
             UrlState::TimedOut(ref url) => format!("x {} (timed out)", url).fmt(f),
-            UrlState::Malformed(ref url) => format!("x {} (malformed)", url).fmt(f)
+            UrlState::Malformed(ref url) => format!("x {} (malformed)", url).fmt(f),
         }
     }
 }
 
 fn build_url(domain: &str, path: &str) -> ParseResult<Url> {
-    let base_url_string = format!("http:://{}", domain);
+    let base_url_string = format!("http://{}", domain);
     let base_url = Url::parse(&base_url_string).unwrap();
 
     let mut raw_url_parser = UrlParser::new();
@@ -45,6 +45,7 @@ fn build_url(domain: &str, path: &str) -> ParseResult<Url> {
 
     url_parser.parse(path)
 }
+
 
 pub fn url_status(domain: &str, path: &str) -> UrlState {
     match build_url(domain, path) {
@@ -54,47 +55,45 @@ pub fn url_status(domain: &str, path: &str) -> UrlState {
             let u = url.clone();
 
             thread::spawn(move || {
-                let mut client = Client::new();
+                let client = Client::new();
                 let url_string = url.serialize();
                 let resp = client.get(&url_string).send();
 
                 let _ = req_tx.send(match resp {
-                    Ok(r) => {
-                        if let StatusCode::Ok = r.status {
-                            UrlState::Accessible(url)
-                        } else {
-                            UrlState::BadStatus(url, r.status)
-                        }
+                    Ok(r) => if let StatusCode::Ok = r.status {
+                        UrlState::Accessible(url)
+                    } else {
+                        UrlState::BadStatus(url, r.status)
                     },
-                    Err(_) => UrlState::ConnectionFailed(url)
+                    Err(_) => UrlState::ConnectionFailed(url),
                 });
             });
+
             thread::spawn(move || {
                 thread::sleep(Duration::from_secs(TIMEOUT));
                 let _ = tx.send(UrlState::TimedOut(u));
             });
 
             rx.recv().unwrap()
-        },
-        Err(_) => UrlState::Malformed(path.to_owned())
+        }
+        Err(_) => UrlState::Malformed(path.to_owned()),
     }
 }
 
 pub fn fetch_url(url: &Url) -> String {
-    let mut client = Client::new();
+    let client = Client::new();
 
     let url_string = url.serialize();
-
     let mut res = client
         .get(&url_string)
         .send()
         .ok()
-        .expect("Could not fetch url");
+        .expect("could not fetch URL");
 
     let mut body = String::new();
     match res.read_to_string(&mut body) {
         Ok(_) => body,
-        Err(_) => String::new()
+        Err(_) => String::new(),
     }
 }
 

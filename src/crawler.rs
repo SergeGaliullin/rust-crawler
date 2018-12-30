@@ -2,19 +2,17 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
-
 use url::Url;
 
 use fetch::{fetch_all_urls, url_status, UrlState};
 
-const THREADS: i32 = 8;
+const THREADS: i32 = 20;
 
 pub struct Crawler {
     to_visit: Arc<Mutex<Vec<String>>>,
     active_count: Arc<Mutex<i32>>,
-    url_states: Receiver<UrlState>
+    url_states: Receiver<UrlState>,
 }
-
 
 impl Iterator for Crawler {
     type Item = UrlState;
@@ -41,8 +39,9 @@ impl Iterator for Crawler {
 fn crawl_worker_thread(
     domain: &str,
     to_visit: Arc<Mutex<Vec<String>>>,
+    visited: Arc<Mutex<HashSet<String>>>,
     active_count: Arc<Mutex<i32>>,
-    url_states: Sender<UrlState>
+    url_states: Sender<UrlState>,
 ) {
     loop {
         let current;
@@ -55,10 +54,12 @@ fn crawl_worker_thread(
                 } else {
                     break;
                 }
-            }
+            };
             current = to_visit_val.pop().unwrap();
             *active_count_val += 1;
+            assert!(*active_count_val <= THREADS);
         }
+
         {
             let mut visited_val = visited.lock().unwrap();
             if visited_val.contains(&current) {
@@ -85,7 +86,7 @@ fn crawl_worker_thread(
         {
             let mut active_count_val = active_count.lock().unwrap();
             *active_count_val -= 1;
-            assert!(active_count_val >= 0);
+            assert!(*active_count_val >= 0);
         }
 
         url_states.send(state).unwrap();
@@ -102,7 +103,7 @@ pub fn crawl(domain: &str, start_url: &Url) -> Crawler {
     let crawler = Crawler {
         to_visit: to_visit.clone(),
         active_count: active_count.clone(),
-        url_states: rx
+        url_states: rx,
     };
 
     for _ in 0..THREADS {
@@ -116,6 +117,6 @@ pub fn crawl(domain: &str, start_url: &Url) -> Crawler {
             crawl_worker_thread(&domain, to_visit, visited, active_count, tx);
         });
     }
+
     crawler
 }
-
